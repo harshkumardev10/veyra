@@ -27,6 +27,8 @@ import {
   Check,
   CheckCheck,
   Circle,
+  Heart,
+  Smile,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -45,8 +47,59 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [heartAnimId, setHeartAnimId] = useState<string | null>(null);
+  const [activeReactionPickerMsgId, setActiveReactionPickerMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastTapRef = useRef<{ msgId: string; time: number } | null>(null);
+  const longPressTimerRef = useRef<any>(null);
+
+  const toggleReaction = async (msgId: string, emoji: string = '❤️') => {
+    if (!activeChatId || !user) return;
+    const msg = messages.find((m) => m.id === msgId);
+    if (!msg) return;
+
+    const currentReactions = msg.reactions || {};
+    const updatedReactions = { ...currentReactions };
+
+    if (updatedReactions[user.uid] === emoji) {
+      delete updatedReactions[user.uid];
+    } else {
+      updatedReactions[user.uid] = emoji;
+    }
+
+    try {
+      await updateDoc(doc(db, 'chats', activeChatId, 'messages', msgId), {
+        reactions: updatedReactions,
+      });
+    } catch (err) {
+      console.error('Error updating reaction:', err);
+    }
+  };
+
+  const handleMessageTap = (msgId: string) => {
+    const now = Date.now();
+    if (lastTapRef.current && lastTapRef.current.msgId === msgId && now - lastTapRef.current.time < 300) {
+      toggleReaction(msgId, '❤️');
+      setHeartAnimId(msgId);
+      setTimeout(() => setHeartAnimId(null), 900);
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { msgId, time: now };
+    }
+  };
+
+  const handleTouchStart = (msgId: string) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setActiveReactionPickerMsgId((prev) => (prev === msgId ? null : msgId));
+    }, 450);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  };
 
   // Load my chats in real-time (sorted in client to avoid requiring composite Firestore index)
   useEffect(() => {
@@ -511,19 +564,114 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
                         )}
                       </div>
                     )}
-                    <div className={`max-w-[70%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                    <div className={`max-w-[70%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col relative group`}>
                       {!isMe && showAvatar && (
                         <span className="text-[10px] text-slate-500 ml-1">{msg.senderName}</span>
                       )}
-                      <div
-                        className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
-                          isMe
-                            ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-br-sm font-medium'
-                            : 'bg-[#1E293B] text-slate-100 border border-slate-800/80 rounded-bl-sm'
-                        }`}
-                      >
-                        {msg.text}
+
+                      {/* Floating Emoji Picker Popup */}
+                      <AnimatePresence>
+                        {activeReactionPickerMsgId === msg.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                            animate={{ opacity: 1, scale: 1, y: -8 }}
+                            exit={{ opacity: 0, scale: 0.8, y: 5 }}
+                            className={`absolute z-30 -top-9 ${isMe ? 'right-0' : 'left-0'} bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-1 shadow-2xl flex items-center space-x-1.5 backdrop-blur-md`}
+                          >
+                            {['❤️', '👍', '😂', '😮', '😢', '🔥'].map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleReaction(msg.id, emoji);
+                                  setActiveReactionPickerMsgId(null);
+                                }}
+                                className="hover:scale-130 active:scale-95 transition-transform text-sm leading-none p-1 rounded-full hover:bg-slate-800"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Heart Burst Double-Tap Animation */}
+                      <AnimatePresence>
+                        {heartAnimId === msg.id && (
+                          <motion.div
+                            initial={{ opacity: 1, scale: 0.4, y: 0 }}
+                            animate={{ opacity: 0, scale: 2.2, y: -30 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.7, ease: 'easeOut' }}
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
+                          >
+                            <span className="text-4xl drop-shadow-xl select-none">❤️</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Message Content Bubble with Double-Tap & Long-Press Handlers */}
+                      <div className="relative flex items-center group/bubble">
+                        <div
+                          onTouchStart={() => handleTouchStart(msg.id)}
+                          onTouchEnd={handleTouchEnd}
+                          onMouseDown={() => handleTouchStart(msg.id)}
+                          onMouseUp={handleTouchEnd}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
+                          }}
+                          onClick={() => handleMessageTap(msg.id)}
+                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed cursor-pointer select-none transition-all ${
+                            isMe
+                              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-br-sm font-medium shadow-md shadow-amber-500/10'
+                              : 'bg-[#1E293B] text-slate-100 border border-slate-800/80 rounded-bl-sm shadow-md'
+                          }`}
+                        >
+                          {msg.text}
+                        </div>
+
+                        {/* Desktop Hover Quick React Trigger */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
+                          }}
+                          className={`opacity-0 group-hover/bubble:opacity-100 transition-opacity p-1 rounded-full text-slate-400 hover:text-amber-400 hover:bg-slate-800 ${
+                            isMe ? '-order-1 mr-1' : 'ml-1'
+                          }`}
+                          title="React"
+                        >
+                          <Smile className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+
+                      {/* Reactions Badge */}
+                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleReaction(msg.id, '❤️');
+                          }}
+                          className={`-mt-1.5 z-20 inline-flex items-center space-x-1 bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-0.5 shadow-md cursor-pointer hover:scale-105 transition-transform ${
+                            isMe ? 'self-end mr-1' : 'self-start ml-1'
+                          }`}
+                          title="Click to toggle reaction"
+                        >
+                          {Array.from(new Set(Object.values(msg.reactions))).map((emoji, idx) => (
+                            <span key={idx} className="text-xs leading-none">
+                              {emoji}
+                            </span>
+                          ))}
+                          {Object.keys(msg.reactions).length > 1 && (
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {Object.keys(msg.reactions).length}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Timestamp & Status */}
                       <div className={`flex items-center space-x-1 px-1 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}>
                         <span className="text-[10px] text-slate-600">{formatTime(msg.createdAt)}</span>
                         {isMe && (

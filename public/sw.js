@@ -1,5 +1,5 @@
 // VEYRA Service Worker — enables PWA install & basic offline caching
-const CACHE_NAME = 'veyra-v2';
+const CACHE_NAME = 'veyra-v3';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {

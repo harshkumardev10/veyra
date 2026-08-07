@@ -22,6 +22,7 @@ export interface ChatMessage {
   type: 'text' | 'image';
   imageUrl?: string;
   status: 'sent' | 'delivered' | 'seen';
+  reactions?: Record<string, string>; // userUid -> emoji
 }
 
 export interface Chat {
