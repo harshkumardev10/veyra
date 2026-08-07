@@ -104,7 +104,12 @@ const AppShell: React.FC = () => {
             transition={{ duration: 0.15 }}
             className="flex-1 overflow-hidden h-[calc(100vh-120px)] flex flex-col"
           >
-            {activeTab === 'chat' && <ChatPage />}
+            {activeTab === 'chat' && (
+              <ChatPage
+                initialFriendUid={chatNavigationData?.friendUid}
+                onClearInitialFriend={() => setChatNavigationData(null)}
+              />
+            )}
             {activeTab === 'friends' && <FriendsPage onOpenChat={handleOpenChatFromFriends} />}
             {activeTab === 'profile' && (
               <div className="flex-1 overflow-y-auto">

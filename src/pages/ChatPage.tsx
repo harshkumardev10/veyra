@@ -30,7 +30,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const ChatPage: React.FC = () => {
+interface ChatPageProps {
+  initialFriendUid?: string | null;
+  onClearInitialFriend?: () => void;
+}
+
+export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearInitialFriend }) => {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -42,21 +47,73 @@ export const ChatPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load my chats in real-time
+  // Load my chats in real-time (sorted in client to avoid requiring composite Firestore index)
   useEffect(() => {
     if (!user) return;
     const q = query(
       collection(db, 'chats'),
-      where('participants', 'array-contains', user.uid),
-      orderBy('lastMessageAt', 'desc'),
-      limit(50)
+      where('participants', 'array-contains', user.uid)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Chat[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Chat));
-      setChats(list);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Chat[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Chat));
+        list.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+        setChats(list);
+      },
+      (err) => {
+        console.error('Error fetching chats:', err);
+      }
+    );
     return () => unsub();
   }, [user]);
+
+  // Keep activeChat updated when chats list updates
+  useEffect(() => {
+    if (!activeChatId || chats.length === 0) return;
+    const updated = chats.find((c) => c.id === activeChatId);
+    if (updated) {
+      setActiveChat(updated);
+    }
+  }, [chats, activeChatId]);
+
+  // Handle navigation to specific friend's chat
+  useEffect(() => {
+    if (!initialFriendUid || !user) return;
+
+    const targetChat = chats.find((c) => c.participants.includes(initialFriendUid));
+    if (targetChat) {
+      setActiveChatId(targetChat.id);
+      setActiveChat(targetChat);
+      setShowMobileChat(true);
+      if (onClearInitialFriend) onClearInitialFriend();
+    } else {
+      // Query directly in case chats list snapshot is still updating
+      const findTargetChat = async () => {
+        try {
+          const q = query(
+            collection(db, 'chats'),
+            where('participants', 'array-contains', user.uid)
+          );
+          const snap = await getDocs(q);
+          const matchDoc = snap.docs.find((d) => {
+            const data = d.data();
+            return data.participants?.includes(initialFriendUid);
+          });
+          if (matchDoc) {
+            const cData = { id: matchDoc.id, ...matchDoc.data() } as Chat;
+            setActiveChatId(cData.id);
+            setActiveChat(cData);
+            setShowMobileChat(true);
+            if (onClearInitialFriend) onClearInitialFriend();
+          }
+        } catch (e) {
+          console.error('Error finding target chat:', e);
+        }
+      };
+      findTargetChat();
+    }
+  }, [initialFriendUid, chats, user, onClearInitialFriend]);
 
   // Load messages for active chat in real-time
   useEffect(() => {
@@ -67,22 +124,28 @@ export const ChatPage: React.FC = () => {
       orderBy('createdAt', 'asc'),
       limit(100)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const msgs: ChatMessage[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
-      setMessages(msgs);
-      // mark messages as seen
-      msgs.forEach((m) => {
-        if (m.senderId !== user?.uid && m.status !== 'seen') {
-          updateDoc(doc(db, 'chats', activeChatId, 'messages', m.id), { status: 'seen' });
-        }
-      });
-      // reset unread count
-      if (user) {
-        updateDoc(doc(db, 'chats', activeChatId), {
-          [`unreadCount.${user.uid}`]: 0,
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const msgs: ChatMessage[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatMessage));
+        setMessages(msgs);
+        // mark messages as seen
+        msgs.forEach((m) => {
+          if (m.senderId !== user?.uid && m.status !== 'seen') {
+            updateDoc(doc(db, 'chats', activeChatId, 'messages', m.id), { status: 'seen' }).catch(() => {});
+          }
         });
+        // reset unread count
+        if (user) {
+          updateDoc(doc(db, 'chats', activeChatId), {
+            [`unreadCount.${user.uid}`]: 0,
+          }).catch(() => {});
+        }
+      },
+      (err) => {
+        console.error('Error fetching messages:', err);
       }
-    });
+    );
     return () => unsub();
   }, [activeChatId, user]);
 
