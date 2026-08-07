@@ -44,9 +44,9 @@ const AppShell: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] flex flex-col">
+    <div className="h-screen w-screen bg-[#0B0F17] flex flex-col overflow-hidden">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 bg-[#0B0F17]/90 backdrop-blur-md border-b border-slate-800/60 px-4 py-3 flex items-center justify-between">
+      <header className="flex-shrink-0 z-40 bg-[#0B0F17]/90 backdrop-blur-md border-b border-slate-800/60 px-4 py-3 flex items-center justify-between">
         <div
           onClick={() => window.location.reload()}
           className="flex items-center space-x-2.5 cursor-pointer hover:opacity-85 transition-opacity"
@@ -94,7 +94,7 @@ const AppShell: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden max-w-7xl w-full mx-auto flex flex-col">
+      <main className="flex-1 overflow-hidden max-w-7xl w-full mx-auto flex flex-col pb-[58px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -102,7 +102,7 @@ const AppShell: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="flex-1 overflow-hidden h-[calc(100vh-120px)] flex flex-col"
+            className="flex-1 overflow-hidden h-full flex flex-col"
           >
             {activeTab === 'chat' && (
               <ChatPage
