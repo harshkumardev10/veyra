@@ -168,41 +168,45 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
 
   const openChatWithFriend = async (friend: Friend) => {
     if (!user) return;
-    // Check if chat exists
-    const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', user.uid),
-    );
-    const snap = await getDocs(q);
-    const existing = snap.docs.find((d) => {
-      const data = d.data();
-      return data.participants.includes(friend.uid) && data.participants.length === 2;
-    });
+    try {
+      // Check if chat exists
+      const q = query(
+        collection(db, 'chats'),
+        where('participants', 'array-contains', user.uid),
+      );
+      const snap = await getDocs(q);
+      const existing = snap.docs.find((d) => {
+        const data = d.data();
+        return data.participants?.includes(friend.uid) && data.participants?.length === 2;
+      });
 
-    if (existing) {
-      onOpenChat(friend.uid, friend.displayName, friend.photoURL);
-      return;
+      if (existing) {
+        onOpenChat(friend.uid, friend.displayName || 'Friend', friend.photoURL || '');
+        return;
+      }
+
+      // Create new chat safely without any undefined properties
+      await addDoc(collection(db, 'chats'), {
+        participants: [user.uid, friend.uid],
+        participantNames: {
+          [user.uid]: user.displayName || 'User',
+          [friend.uid]: friend.displayName || 'Friend',
+        },
+        participantPhotos: {
+          [user.uid]: user.photoURL || '',
+          [friend.uid]: friend.photoURL || '',
+        },
+        lastMessage: '',
+        lastMessageAt: Date.now(),
+        lastSenderId: '',
+        unreadCount: { [user.uid]: 0, [friend.uid]: 0 },
+        createdAt: Date.now(),
+      });
+
+      onOpenChat(friend.uid, friend.displayName || 'Friend', friend.photoURL || '');
+    } catch (err) {
+      console.error('Error opening chat with friend:', err);
     }
-
-    // Create new chat
-    await addDoc(collection(db, 'chats'), {
-      participants: [user.uid, friend.uid],
-      participantNames: {
-        [user.uid]: user.displayName,
-        [friend.uid]: friend.displayName,
-      },
-      participantPhotos: {
-        [user.uid]: user.photoURL,
-        [friend.uid]: friend.photoURL,
-      },
-      lastMessage: '',
-      lastMessageAt: Date.now(),
-      lastSenderId: '',
-      unreadCount: { [user.uid]: 0, [friend.uid]: 0 },
-      createdAt: Date.now(),
-    });
-
-    onOpenChat(friend.uid, friend.displayName, friend.photoURL);
   };
 
   const tabs = [

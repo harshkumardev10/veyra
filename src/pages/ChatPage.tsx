@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
-import type { Chat, ChatMessage } from '../types';
+import type { Chat, ChatMessage, Friend, UserProfile } from '../types';
 import {
   Send,
   MessageSquare,
@@ -38,6 +38,7 @@ interface ChatPageProps {
 export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearInitialFriend }) => {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -68,6 +69,38 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     return () => unsub();
   }, [user]);
 
+  // Load friends list in real-time
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'friends'),
+      where('users', 'array-contains', user.uid)
+    );
+    const unsub = onSnapshot(q, async (snap) => {
+      const list: Friend[] = [];
+      for (const d of snap.docs) {
+        const data = d.data();
+        const otherUid = data.users.find((u: string) => u !== user.uid);
+        if (otherUid) {
+          const profSnap = await getDoc(doc(db, 'users', otherUid));
+          if (profSnap.exists()) {
+            const prof = profSnap.data() as UserProfile;
+            list.push({
+              uid: otherUid,
+              displayName: prof.displayName,
+              username: prof.username,
+              photoURL: prof.photoURL,
+              isOnline: prof.isOnline,
+              lastSeen: prof.lastSeen,
+            });
+          }
+        }
+      }
+      setFriends(list);
+    });
+    return () => unsub();
+  }, [user]);
+
   // Keep activeChat updated when chats list updates
   useEffect(() => {
     if (!activeChatId || chats.length === 0) return;
@@ -88,8 +121,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
       setShowMobileChat(true);
       if (onClearInitialFriend) onClearInitialFriend();
     } else {
-      // Query directly in case chats list snapshot is still updating
-      const findTargetChat = async () => {
+      // Query directly in case chats list snapshot is still updating, or create if missing
+      const findOrCreateTargetChat = async () => {
         try {
           const q = query(
             collection(db, 'chats'),
@@ -106,12 +139,58 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
             setActiveChat(cData);
             setShowMobileChat(true);
             if (onClearInitialFriend) onClearInitialFriend();
+          } else {
+            // Create chat if non-existent
+            const friendProfSnap = await getDoc(doc(db, 'users', initialFriendUid));
+            const friendProf = friendProfSnap.exists() ? (friendProfSnap.data() as UserProfile) : null;
+            const friendName = friendProf?.displayName || 'Friend';
+            const friendPhoto = friendProf?.photoURL || '';
+
+            const newDocRef = await addDoc(collection(db, 'chats'), {
+              participants: [user.uid, initialFriendUid],
+              participantNames: {
+                [user.uid]: user.displayName || 'User',
+                [initialFriendUid]: friendName,
+              },
+              participantPhotos: {
+                [user.uid]: user.photoURL || '',
+                [initialFriendUid]: friendPhoto,
+              },
+              lastMessage: '',
+              lastMessageAt: Date.now(),
+              lastSenderId: '',
+              unreadCount: { [user.uid]: 0, [initialFriendUid]: 0 },
+              createdAt: Date.now(),
+            });
+
+            const newChat: Chat = {
+              id: newDocRef.id,
+              participants: [user.uid, initialFriendUid],
+              participantNames: {
+                [user.uid]: user.displayName || 'User',
+                [initialFriendUid]: friendName,
+              },
+              participantPhotos: {
+                [user.uid]: user.photoURL || '',
+                [initialFriendUid]: friendPhoto,
+              },
+              lastMessage: '',
+              lastMessageAt: Date.now(),
+              lastSenderId: '',
+              unreadCount: { [user.uid]: 0, [initialFriendUid]: 0 },
+              createdAt: Date.now(),
+            };
+
+            setActiveChatId(newChat.id);
+            setActiveChat(newChat);
+            setShowMobileChat(true);
+            if (onClearInitialFriend) onClearInitialFriend();
           }
         } catch (e) {
-          console.error('Error finding target chat:', e);
+          console.error('Error finding or creating target chat:', e);
         }
       };
-      findTargetChat();
+      findOrCreateTargetChat();
     }
   }, [initialFriendUid, chats, user, onClearInitialFriend]);
 
@@ -161,6 +240,56 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     setTimeout(() => inputRef.current?.focus(), 200);
   };
 
+  const startChatWithFriend = async (friend: Friend) => {
+    if (!user) return;
+    try {
+      const existing = chats.find((c) => c.participants.includes(friend.uid));
+      if (existing) {
+        openChat(existing);
+        return;
+      }
+
+      const newDocRef = await addDoc(collection(db, 'chats'), {
+        participants: [user.uid, friend.uid],
+        participantNames: {
+          [user.uid]: user.displayName || 'User',
+          [friend.uid]: friend.displayName || 'Friend',
+        },
+        participantPhotos: {
+          [user.uid]: user.photoURL || '',
+          [friend.uid]: friend.photoURL || '',
+        },
+        lastMessage: '',
+        lastMessageAt: Date.now(),
+        lastSenderId: '',
+        unreadCount: { [user.uid]: 0, [friend.uid]: 0 },
+        createdAt: Date.now(),
+      });
+
+      const newChat: Chat = {
+        id: newDocRef.id,
+        participants: [user.uid, friend.uid],
+        participantNames: {
+          [user.uid]: user.displayName || 'User',
+          [friend.uid]: friend.displayName || 'Friend',
+        },
+        participantPhotos: {
+          [user.uid]: user.photoURL || '',
+          [friend.uid]: friend.photoURL || '',
+        },
+        lastMessage: '',
+        lastMessageAt: Date.now(),
+        lastSenderId: '',
+        unreadCount: { [user.uid]: 0, [friend.uid]: 0 },
+        createdAt: Date.now(),
+      };
+
+      openChat(newChat);
+    } catch (err) {
+      console.error('Error starting chat:', err);
+    }
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || !activeChatId || !user || sending) return;
     const text = inputText.trim();
@@ -172,8 +301,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
       await addDoc(msgRef, {
         text,
         senderId: user.uid,
-        senderName: user.displayName,
-        senderPhoto: user.photoURL,
+        senderName: user.displayName || 'User',
+        senderPhoto: user.photoURL || '',
         chatId: activeChatId,
         createdAt: Date.now(),
         type: 'text',
@@ -229,12 +358,45 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
 
         <div className="flex-1 overflow-y-auto">
           {chats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-slate-800/60 flex items-center justify-center">
-                <Users className="w-7 h-7 text-slate-500" />
-              </div>
-              <p className="text-sm text-slate-400">No conversations yet</p>
-              <p className="text-xs text-slate-600">Add friends and start chatting!</p>
+            <div className="p-4 space-y-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
+                Start a Conversation
+              </p>
+              {friends.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-6 space-y-2 border border-slate-800/60 rounded-2xl bg-slate-900/40">
+                  <Users className="w-7 h-7 text-slate-500" />
+                  <p className="text-sm text-slate-300">No friends added yet</p>
+                  <p className="text-xs text-slate-500">Go to Friends tab to find and add friends!</p>
+                </div>
+              ) : (
+                friends.map((friend) => (
+                  <button
+                    key={friend.uid}
+                    onClick={() => startChatWithFriend(friend)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800/60 transition-all text-left group"
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={friend.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(friend.displayName)}`}
+                          alt={friend.displayName}
+                          className="w-10 h-10 rounded-full object-cover border border-slate-700"
+                        />
+                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0F1724] ${friend.isOnline ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-200 group-hover:text-amber-400 transition-colors truncate">
+                          {friend.displayName}
+                        </p>
+                        <p className="text-[10px] text-emerald-400">
+                          {friend.isOnline ? 'Online' : 'Click to start chat'}
+                        </p>
+                      </div>
+                    </div>
+                    <MessageSquare className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                  </button>
+                ))
+              )}
             </div>
           ) : (
             chats.map((chat) => {
