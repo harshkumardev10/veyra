@@ -61,7 +61,14 @@ const AppShell: React.FC = () => {
     );
   }
 
-  if (!user) return <AuthPage />;
+  if (!user) {
+    return (
+      <>
+        <AuthPage />
+        <InstallBanner />
+      </>
+    );
+  }
 
   const handleOpenChatFromFriends = (friendUid: string, friendName: string, friendPhoto: string) => {
     setChatNavigationData({ friendUid, friendName, friendPhoto });
