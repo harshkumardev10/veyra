@@ -396,8 +396,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
   return (
     <div className="flex-1 h-full w-full flex overflow-hidden">
       {/* --- Sidebar: Chat List --- */}
-      <div className={`flex flex-col w-full md:w-80 lg:w-96 bg-[#0F1724] border-r border-slate-800/60 flex-shrink-0 ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
-        <div className="px-4 py-4 border-b border-slate-800/60">
+      <div className={`flex flex-col w-full md:w-80 lg:w-96 bg-[#0F1724] border-r border-slate-800/60 flex-shrink-0 ${showMobileChat ? 'hidden md:flex' : 'flex'}`} style={{ minHeight: 0 }}>
+        <div className="px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
           <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
             <MessageSquare className="w-5 h-5 text-amber-400" />
             <span>Messages</span>
@@ -501,212 +501,254 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
       </div>
 
       {/* --- Main Chat Window --- */}
-      <div className={`flex-1 flex flex-col ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
-        {!activeChatId ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4">
-            <div className="w-20 h-20 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-              <MessageSquare className="w-9 h-9 text-amber-400" />
+      <div className={`flex-1 flex overflow-hidden ${!showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+        {/* Conversation Panel */}
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          {!activeChatId ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4">
+              <div className="w-20 h-20 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <MessageSquare className="w-9 h-9 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-200">Select a conversation</h3>
+                <p className="text-xs text-slate-500 mt-1">Choose from your chats or add a new friend</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-200">Select a conversation</h3>
-              <p className="text-xs text-slate-500 mt-1">Choose from your chats or add a new friend</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Chat Header */}
-            <div className="flex items-center space-x-3 px-4 py-3 bg-[#0F1724] border-b border-slate-800/60">
-              <button
-                onClick={() => { setShowMobileChat(false); }}
-                className="md:hidden p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              {activeChat && (() => {
-                const other = getOtherParticipant(activeChat);
-                return (
-                  <>
-                    <img
-                      src={other.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(other.name)}`}
-                      alt={other.name}
-                      className="w-9 h-9 rounded-full object-cover border border-slate-700"
-                    />
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-100">{other.name}</h3>
-                      <p className="text-[10px] text-emerald-400">Active</p>
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0B0F17]">
-              {messages.map((msg, i) => {
-                const isMe = msg.senderId === user?.uid;
-                const showAvatar = !isMe && (i === 0 || messages[i - 1]?.senderId !== msg.senderId);
-
-                return (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex items-end space-x-2 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}
-                  >
-                    {!isMe && (
-                      <div className="w-7 flex-shrink-0">
-                        {showAvatar && (
-                          <img
-                            src={msg.senderPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(msg.senderName)}`}
-                            alt={msg.senderName}
-                            className="w-7 h-7 rounded-full object-cover border border-slate-700"
-                          />
-                        )}
+          ) : (
+            <>
+              {/* Chat Header */}
+              <div className="flex items-center space-x-3 px-4 py-3 bg-[#0F1724] border-b border-slate-800/60 flex-shrink-0">
+                <button
+                  onClick={() => { setShowMobileChat(false); }}
+                  className="md:hidden p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                {activeChat && (() => {
+                  const other = getOtherParticipant(activeChat);
+                  return (
+                    <>
+                      <img
+                        src={other.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(other.name)}`}
+                        alt={other.name}
+                        className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                      />
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-100">{other.name}</h3>
+                        <p className="text-[10px] text-emerald-400">Active</p>
                       </div>
-                    )}
-                    <div className={`max-w-[70%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col relative group`}>
-                      {!isMe && showAvatar && (
-                        <span className="text-[10px] text-slate-500 ml-1">{msg.senderName}</span>
-                      )}
+                    </>
+                  );
+                })()}
+              </div>
 
-                      {/* Floating Emoji Picker Popup */}
-                      <AnimatePresence>
-                        {activeReactionPickerMsgId === msg.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.8, y: 5 }}
-                            animate={{ opacity: 1, scale: 1, y: -8 }}
-                            exit={{ opacity: 0, scale: 0.8, y: 5 }}
-                            className={`absolute z-30 -top-9 ${isMe ? 'right-0' : 'left-0'} bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-1 shadow-2xl flex items-center space-x-1.5 backdrop-blur-md`}
-                          >
-                            {['❤️', '👍', '😂', '😮', '😢', '🔥'].map((emoji) => (
-                              <button
-                                key={emoji}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleReaction(msg.id, emoji);
-                                  setActiveReactionPickerMsgId(null);
-                                }}
-                                className="hover:scale-130 active:scale-95 transition-transform text-sm leading-none p-1 rounded-full hover:bg-slate-800"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+              {/* Messages — independently scrollable */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0B0F17]" style={{ minHeight: 0 }}>
+                {messages.map((msg, i) => {
+                  const isMe = msg.senderId === user?.uid;
+                  const showAvatar = !isMe && (i === 0 || messages[i - 1]?.senderId !== msg.senderId);
 
-                      {/* Heart Burst Double-Tap Animation */}
-                      <AnimatePresence>
-                        {heartAnimId === msg.id && (
-                          <motion.div
-                            initial={{ opacity: 1, scale: 0.4, y: 0 }}
-                            animate={{ opacity: 0, scale: 2.2, y: -30 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.7, ease: 'easeOut' }}
-                            className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
-                          >
-                            <span className="text-4xl drop-shadow-xl select-none">❤️</span>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Message Content Bubble with Double-Tap & Long-Press Handlers */}
-                      <div className="relative flex items-center group/bubble">
-                        <div
-                          onTouchStart={() => handleTouchStart(msg.id)}
-                          onTouchEnd={handleTouchEnd}
-                          onMouseDown={() => handleTouchStart(msg.id)}
-                          onMouseUp={handleTouchEnd}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
-                          }}
-                          onClick={() => handleMessageTap(msg.id)}
-                          className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed cursor-pointer select-none transition-all ${
-                            isMe
-                              ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-br-sm font-medium shadow-md shadow-amber-500/10'
-                              : 'bg-[#1E293B] text-slate-100 border border-slate-800/80 rounded-bl-sm shadow-md'
-                          }`}
-                        >
-                          {msg.text}
-                        </div>
-
-                        {/* Desktop Hover Quick React Trigger */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
-                          }}
-                          className={`opacity-0 group-hover/bubble:opacity-100 transition-opacity p-1 rounded-full text-slate-400 hover:text-amber-400 hover:bg-slate-800 ${
-                            isMe ? '-order-1 mr-1' : 'ml-1'
-                          }`}
-                          title="React"
-                        >
-                          <Smile className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Reactions Badge */}
-                      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleReaction(msg.id, '❤️');
-                          }}
-                          className={`-mt-1.5 z-20 inline-flex items-center space-x-1 bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-0.5 shadow-md cursor-pointer hover:scale-105 transition-transform ${
-                            isMe ? 'self-end mr-1' : 'self-start ml-1'
-                          }`}
-                          title="Click to toggle reaction"
-                        >
-                          {Array.from(new Set(Object.values(msg.reactions))).map((emoji, idx) => (
-                            <span key={idx} className="text-xs leading-none">
-                              {emoji}
-                            </span>
-                          ))}
-                          {Object.keys(msg.reactions).length > 1 && (
-                            <span className="text-[10px] font-bold text-slate-400">
-                              {Object.keys(msg.reactions).length}
-                            </span>
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex items-end space-x-2 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}
+                    >
+                      {!isMe && (
+                        <div className="w-7 flex-shrink-0">
+                          {showAvatar && (
+                            <img
+                              src={msg.senderPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(msg.senderName)}`}
+                              alt={msg.senderName}
+                              className="w-7 h-7 rounded-full object-cover border border-slate-700"
+                            />
                           )}
                         </div>
                       )}
-
-                      {/* Timestamp & Status */}
-                      <div className={`flex items-center space-x-1 px-1 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                        <span className="text-[10px] text-slate-600">{formatTime(msg.createdAt)}</span>
-                        {isMe && (
-                          msg.status === 'seen'
-                            ? <CheckCheck className="w-3 h-3 text-amber-400" />
-                            : <Check className="w-3 h-3 text-slate-500" />
+                      <div className={`max-w-[70%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col relative group`}>
+                        {!isMe && showAvatar && (
+                          <span className="text-[10px] text-slate-500 ml-1">{msg.senderName}</span>
                         )}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
 
-            {/* Input Bar */}
-            <div className="px-4 py-3 bg-[#0F1724] border-t border-slate-800/60 flex items-center space-x-2">
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Type a message..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!inputText.trim() || sending}
-                className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+                        {/* Floating Emoji Picker Popup */}
+                        <AnimatePresence>
+                          {activeReactionPickerMsgId === msg.id && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.8, y: 5 }}
+                              animate={{ opacity: 1, scale: 1, y: -8 }}
+                              exit={{ opacity: 0, scale: 0.8, y: 5 }}
+                              className={`absolute z-30 -top-9 ${isMe ? 'right-0' : 'left-0'} bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-1 shadow-2xl flex items-center space-x-1.5 backdrop-blur-md`}
+                            >
+                              {['❤️', '👍', '😂', '😮', '😢', '🔥'].map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleReaction(msg.id, emoji);
+                                    setActiveReactionPickerMsgId(null);
+                                  }}
+                                  className="hover:scale-130 active:scale-95 transition-transform text-sm leading-none p-1 rounded-full hover:bg-slate-800"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Heart Burst Double-Tap Animation */}
+                        <AnimatePresence>
+                          {heartAnimId === msg.id && (
+                            <motion.div
+                              initial={{ opacity: 1, scale: 0.4, y: 0 }}
+                              animate={{ opacity: 0, scale: 2.2, y: -30 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.7, ease: 'easeOut' }}
+                              className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
+                            >
+                              <span className="text-4xl drop-shadow-xl select-none">❤️</span>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Message Content Bubble */}
+                        <div className="relative flex items-center group/bubble">
+                          <div
+                            onTouchStart={() => handleTouchStart(msg.id)}
+                            onTouchEnd={handleTouchEnd}
+                            onMouseDown={() => handleTouchStart(msg.id)}
+                            onMouseUp={handleTouchEnd}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
+                            }}
+                            onClick={() => handleMessageTap(msg.id)}
+                            className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed cursor-pointer select-none transition-all ${
+                              isMe
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-br-sm font-medium shadow-md shadow-amber-500/10'
+                                : 'bg-[#1E293B] text-slate-100 border border-slate-800/80 rounded-bl-sm shadow-md'
+                            }`}
+                          >
+                            {msg.text}
+                          </div>
+
+                          {/* Desktop Hover Quick React Trigger */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveReactionPickerMsgId((prev) => (prev === msg.id ? null : msg.id));
+                            }}
+                            className={`opacity-0 group-hover/bubble:opacity-100 transition-opacity p-1 rounded-full text-slate-400 hover:text-amber-400 hover:bg-slate-800 ${
+                              isMe ? '-order-1 mr-1' : 'ml-1'
+                            }`}
+                            title="React"
+                          >
+                            <Smile className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Reactions Badge */}
+                        {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleReaction(msg.id, '❤️');
+                            }}
+                            className={`-mt-1.5 z-20 inline-flex items-center space-x-1 bg-[#0F1724] border border-slate-700/80 rounded-full px-2 py-0.5 shadow-md cursor-pointer hover:scale-105 transition-transform ${
+                              isMe ? 'self-end mr-1' : 'self-start ml-1'
+                            }`}
+                            title="Click to toggle reaction"
+                          >
+                            {Array.from(new Set(Object.values(msg.reactions))).map((emoji, idx) => (
+                              <span key={idx} className="text-xs leading-none">
+                                {emoji}
+                              </span>
+                            ))}
+                            {Object.keys(msg.reactions).length > 1 && (
+                              <span className="text-[10px] font-bold text-slate-400">
+                                {Object.keys(msg.reactions).length}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Timestamp & Status */}
+                        <div className={`flex items-center space-x-1 px-1 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                          <span className="text-[10px] text-slate-600">{formatTime(msg.createdAt)}</span>
+                          {isMe && (
+                            msg.status === 'seen'
+                              ? <CheckCheck className="w-3 h-3 text-amber-400" />
+                              : <Check className="w-3 h-3 text-slate-500" />
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input Bar — always visible, pinned at bottom */}
+              <div className="px-4 py-3 bg-[#0F1724] border-t border-slate-800/60 flex items-center space-x-2 flex-shrink-0">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Type a message..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!inputText.trim() || sending}
+                  className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* --- Friends Panel (right side) --- */}
+        {friends.length > 0 && (
+          <div className="hidden lg:flex flex-col w-64 bg-[#0F1724] border-l border-slate-800/60 flex-shrink-0" style={{ minHeight: 0 }}>
+            <div className="px-4 py-4 border-b border-slate-800/60 flex-shrink-0">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-2">
+                <Users className="w-4 h-4 text-amber-400" />
+                <span>Friends</span>
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-500">{friends.length}</span>
+              </h2>
             </div>
-          </>
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {friends.map((friend) => (
+                <button
+                  key={friend.uid}
+                  onClick={() => startChatWithFriend(friend)}
+                  className="w-full flex items-center space-x-3 p-2.5 rounded-xl hover:bg-slate-800/60 transition-all text-left group"
+                >
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={friend.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(friend.displayName)}`}
+                      alt={friend.displayName}
+                      className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                    />
+                    <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0F1724] ${friend.isOnline ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-200 group-hover:text-amber-400 transition-colors truncate">
+                      {friend.displayName}
+                    </p>
+                    <p className={`text-[10px] truncate ${friend.isOnline ? 'text-emerald-400' : 'text-slate-500'}`}>
+                      {friend.isOnline ? 'Online' : 'Offline'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
