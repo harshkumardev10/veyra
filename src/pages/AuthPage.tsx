@@ -22,20 +22,24 @@ export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const createUserDoc = async (uid: string, displayName: string, email: string, photoURL: string, usernameVal: string) => {
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) {
-      await setDoc(userRef, {
-        uid,
-        email,
-        displayName,
-        username: usernameVal || email.split('@')[0],
-        photoURL: photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
-        bio: '',
-        createdAt: Date.now(),
-        isOnline: true,
-        lastSeen: Date.now(),
-      });
+    try {
+      const userRef = doc(db, 'users', uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid,
+          email,
+          displayName,
+          username: usernameVal || email.split('@')[0],
+          photoURL: photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+          bio: '',
+          createdAt: Date.now(),
+          isOnline: true,
+          lastSeen: Date.now(),
+        });
+      }
+    } catch (err) {
+      console.warn('Error checking/creating user doc:', err);
     }
   };
 
