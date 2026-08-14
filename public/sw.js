@@ -1,5 +1,40 @@
-// VEYRA Service Worker — enables PWA install, offline caching & push notifications
-const CACHE_NAME = 'veyra-v5';
+// VEYRA Service Worker — PWA install, offline cache & Firebase Cloud Messaging push notifications
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
+// Initialize Firebase in SW
+firebase.initializeApp({
+  apiKey: 'AIzaSyAYHO2GCdvtmPr8lXzsJM1Lf0fCBCzeSBE',
+  authDomain: 'veyra-app-d297a.firebaseapp.com',
+  projectId: 'veyra-app-d297a',
+  storageBucket: 'veyra-app-d297a.firebasestorage.app',
+  messagingSenderId: '397763809738',
+  appId: '1:397763809738:web:7037502e08415a38bdff33',
+});
+
+const messaging = firebase.messaging();
+
+// Handle background FCM push messages (app closed or backgrounded)
+// Firebase SDK handles this automatically and shows the notification
+messaging.onBackgroundMessage((payload) => {
+  const title = payload.notification?.title || '💬 New Message';
+  const body = payload.notification?.body || 'You have a new message on VEYRA';
+  const icon = payload.notification?.icon || './pwa-192x192.png';
+  const chatId = payload.data?.chatId || '';
+
+  return self.registration.showNotification(title, {
+    body,
+    icon,
+    badge: './pwa-192x192.png',
+    tag: chatId || 'veyra-msg',
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: { chatId },
+  });
+});
+
+// --- PWA Caching ---
+const CACHE_NAME = 'veyra-v6';
 const PRECACHE = ['./', './index.html'];
 
 self.addEventListener('install', (event) => {
@@ -18,18 +53,17 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first strategy — show cached shell if offline
+// Network-first strategy for app shell
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('firestore') || event.request.url.includes('firebase')) return;
+  if (event.request.url.includes('firestore') || event.request.url.includes('firebase') || event.request.url.includes('gstatic')) return;
 
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
 });
 
-// Listen for messages from the app to show notifications
-// This is triggered when app is backgrounded/minimized
+// Listen for messages from the app to show notifications when app is backgrounded
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, icon, tag, chatId } = event.data.payload;
@@ -42,56 +76,27 @@ self.addEventListener('message', (event) => {
         renotify: true,
         vibrate: [200, 100, 200],
         data: { chatId },
-        actions: [{ action: 'open', title: 'Open Chat' }],
       })
     );
   }
 });
 
-// FCM Push event — fires when app is fully closed (requires FCM server setup)
-self.addEventListener('push', (event) => {
-  let data = { title: 'VEYRA', body: 'You have a new message', icon: './pwa-192x192.png', chatId: '' };
-  if (event.data) {
-    try {
-      data = { ...data, ...event.data.json() };
-    } catch (_e) {
-      data.body = event.data.text();
-    }
-  }
-  event.waitUntil(
-    self.registration.showNotification(`💬 ${data.title}`, {
-      body: data.body,
-      icon: data.icon,
-      badge: './pwa-192x192.png',
-      vibrate: [200, 100, 200],
-      tag: 'veyra-push',
-      renotify: true,
-      data: { chatId: data.chatId },
-    })
-  );
-});
-
-// Notification click handler — focus existing VEYRA window or open new tab
+// Notification click — focus VEYRA tab or open new one, then post chatId to app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const chatId = event.notification.data?.chatId;
-  const urlToOpen = chatId
-    ? self.registration.scope + '#chat=' + chatId
-    : self.registration.scope;
+  const chatId = event.notification.data?.chatId || '';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing VEYRA window/tab if already open
       for (const client of clientList) {
         if (client.url.includes(self.registration.scope) && 'focus' in client) {
           client.postMessage({ type: 'NOTIFICATION_CLICK', chatId });
           return client.focus();
         }
       }
-      // Open new VEYRA tab if not open
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
-      }
+      // Open app if no window is open
+      const openUrl = self.registration.scope + (chatId ? '?chatId=' + chatId : '');
+      if (self.clients.openWindow) return self.clients.openWindow(openUrl);
     })
   );
 });

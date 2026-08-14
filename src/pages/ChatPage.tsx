@@ -480,6 +480,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
         lastSenderId: user.uid,
         ...(otherUid ? { [`unreadCount.${otherUid}`]: (activeChat?.unreadCount?.[otherUid] || 0) + 1 } : {}),
       });
+
+      // Write FCM push request to Firestore so Cloudflare Worker can deliver it to recipient
+      if (otherUid) {
+        addDoc(collection(db, 'pushQueue'), {
+          toUid: otherUid,
+          fromName: user.displayName || 'Someone',
+          fromPhoto: user.photoURL || '',
+          message: text,
+          chatId: activeChatId,
+          createdAt: Date.now(),
+        }).catch(() => {});
+      }
     } finally {
       setSending(false);
     }

@@ -7,11 +7,13 @@ import { ProfilePage } from './pages/ProfilePage';
 import { Heart, MessageSquare, Users, User, Sparkles, Loader2, Bell, BellOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InstallBanner, triggerAppInstall } from './components/InstallBanner';
+import { useFCM } from './hooks/useFCM';
 
 type Tab = 'chat' | 'friends' | 'profile';
 
 const AppShell: React.FC = () => {
   const { user, loading } = useAuth();
+  useFCM(user?.uid ?? null);
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'

@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
+import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAYHO2GCdvtmPr8lXzsJM1Lf0fCBCzeSBE',
@@ -23,5 +24,16 @@ export const db = initializeFirestore(app, {
 });
 
 export const googleProvider = new GoogleAuthProvider();
+
+// Lazy-initialize FCM only in supported environments (not in SW, not in Safari iOS)
+export const getMessagingInstance = async () => {
+  try {
+    const supported = await isSupported();
+    if (!supported) return null;
+    return getMessaging(app);
+  } catch {
+    return null;
+  }
+};
 
 export default app;
