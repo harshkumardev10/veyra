@@ -4,7 +4,7 @@ import { AuthPage } from './pages/AuthPage';
 import { ChatPage } from './pages/ChatPage';
 import { FriendsPage } from './pages/FriendsPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { Heart, MessageSquare, Users, User, Sparkles, Loader2, Download, Bell, BellOff } from 'lucide-react';
+import { Heart, MessageSquare, Users, User, Sparkles, Loader2, Bell, BellOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InstallBanner, triggerAppInstall } from './components/InstallBanner';
 
@@ -107,15 +107,6 @@ const AppShell: React.FC = () => {
             title={notifPermission === 'granted' ? 'Notifications Active' : 'Enable Notifications'}
           >
             {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-          </button>
-
-          <button
-            onClick={() => triggerAppInstall()}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-500/20 active:scale-95 transition-all"
-            title="Install VEYRA App"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Install App</span>
           </button>
 
           <div
