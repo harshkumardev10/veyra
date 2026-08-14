@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, X, Heart, Sparkles, Share, MoreVertical, Smartphone } from 'lucide-react';
+import { Download, X, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -16,7 +16,6 @@ export const triggerAppInstall = () => {
 export const InstallBanner: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(true);
-  const [showMobileGuide, setShowMobileGuide] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [installing, setInstalling] = useState(false);
 
@@ -54,14 +53,10 @@ export const InstallBanner: React.FC = () => {
         if (choice.outcome === 'accepted') {
           setIsStandalone(true);
           setShowBanner(false);
-          setShowMobileGuide(false);
         }
       } catch (_err) {
-        setShowMobileGuide(true);
+        // ignore errors
       }
-    } else {
-      // Prompt not directly available (iOS Safari, in-app browser, or pending Chrome trigger)
-      setShowMobileGuide(true);
     }
     setInstalling(false);
   };
@@ -79,131 +74,56 @@ export const InstallBanner: React.FC = () => {
   if (isStandalone) return null;
 
   return (
-    <>
-      <AnimatePresence>
-        {showBanner && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-2 flex justify-center pointer-events-none"
-          >
-            <div className="w-full max-w-md bg-[#161F30] border border-amber-500/30 rounded-3xl p-4 shadow-2xl shadow-black/80 pointer-events-auto flex items-center gap-3">
-              {/* VEYRA Logo */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-amber-400 p-[2px] shadow-lg shadow-rose-500/20">
-                  <div className="w-full h-full bg-[#161F30] rounded-[9px] flex items-center justify-center">
-                    <Heart className="w-4 h-4 text-rose-400 fill-rose-400/30" />
-                  </div>
+    <AnimatePresence>
+      {showBanner && (
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-2 flex justify-center pointer-events-none"
+        >
+          <div className="w-full max-w-md bg-[#161F30] border border-amber-500/30 rounded-3xl p-4 shadow-2xl shadow-black/80 pointer-events-auto flex items-center gap-3">
+            {/* VEYRA Logo */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-rose-500 to-amber-400 p-[2px] shadow-lg shadow-rose-500/20">
+                <div className="w-full h-full bg-[#161F30] rounded-[9px] flex items-center justify-center">
+                  <Heart className="w-4 h-4 text-rose-400 fill-rose-400/30" />
                 </div>
-                <span className="font-bold text-sm tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-300 hidden sm:block">
-                  VEYRA
-                </span>
               </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-100">Install VEYRA App</p>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Add to home screen for real-time worldwide chat
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  onClick={handleInstallClick}
-                  disabled={installing}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-60"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{installing ? 'Installing…' : 'Install'}</span>
-                </button>
-
-                <button
-                  onClick={handleDismiss}
-                  className="p-1.5 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <span className="font-bold text-sm tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-amber-300 hidden sm:block">
+                VEYRA
+              </span>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Mobile / Fallback Quick Add-to-HomeScreen Guide Sheet */}
-      <AnimatePresence>
-        {showMobileGuide && (
-          <div
-            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setShowMobileGuide(false)}
-          >
-            <motion.div
-              initial={{ y: 80, opacity: 0, scale: 0.95 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 80, opacity: 0, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-[#161F30] rounded-3xl border border-slate-800 p-6 space-y-4 shadow-2xl relative"
-            >
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-100">Install VEYRA App</p>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Add to home screen for real-time worldwide chat
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
-                onClick={() => setShowMobileGuide(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1"
+                onClick={handleInstallClick}
+                disabled={installing}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-60"
               >
-                <X className="w-5 h-5" />
+                <Download className="w-3.5 h-3.5" />
+                <span>{installing ? 'Installing…' : 'Install'}</span>
               </button>
 
-              <div className="flex items-center space-x-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-amber-400 p-[2px] shadow-lg shadow-rose-500/20 flex-shrink-0">
-                  <div className="w-full h-full bg-[#161F30] rounded-[14px] flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-rose-400 fill-rose-400/30" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-100">Add VEYRA to Phone</h3>
-                  <p className="text-xs text-amber-400 font-medium">Install App in 1-Click</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 bg-slate-900/70 rounded-2xl p-4 border border-slate-800 text-xs text-slate-300">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-100">Android / Chrome / Edge:</span>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Tap browser menu (<MoreVertical className="inline w-3.5 h-3.5 text-amber-400" />) → Select <strong>"Install VEYRA"</strong> or <strong>"Add to Home screen"</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-800/80 my-1" />
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 font-bold flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-100">iPhone / Safari:</span>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Tap Share (<Share className="inline w-3.5 h-3.5 text-rose-400" />) → Select <strong>"Add to Home Screen"</strong>.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <button
-                onClick={() => setShowMobileGuide(false)}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold text-xs shadow-lg transition-transform active:scale-95"
+                onClick={handleDismiss}
+                className="p-1.5 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+                aria-label="Close"
               >
-                Got It
+                <X className="w-4 h-4" />
               </button>
-            </motion.div>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
-    </>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
