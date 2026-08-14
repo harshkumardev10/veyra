@@ -104,16 +104,17 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
     return () => unsub();
   }, [user]);
 
-  // Search users by display name or username
+  // Search users by username
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !user) return;
+    const cleanQuery = searchQuery.trim().toLowerCase().replace(/^@/, '');
+    if (!cleanQuery || !user) return;
     setSearching(true);
     try {
       const q = query(
         collection(db, 'users'),
-        where('displayName', '>=', searchQuery),
-        where('displayName', '<=', searchQuery + '\uf8ff'),
-        limit(10)
+        where('username', '>=', cleanQuery),
+        where('username', '<=', cleanQuery + '\uf8ff'),
+        limit(15)
       );
       const snap = await getDocs(q);
       const results: UserProfile[] = snap.docs
@@ -342,7 +343,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
                 <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search by name..."
+                  placeholder="Search by username (e.g. @alex)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}

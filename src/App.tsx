@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthPage } from './pages/AuthPage';
 import { ChatPage } from './pages/ChatPage';
 import { FriendsPage } from './pages/FriendsPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { Heart, MessageSquare, Users, User, Sparkles, Loader2, Download } from 'lucide-react';
+import { Heart, MessageSquare, Users, User, Sparkles, Loader2, Download, Bell, BellOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InstallBanner, triggerAppInstall } from './components/InstallBanner';
 
@@ -13,9 +13,40 @@ type Tab = 'chat' | 'friends' | 'profile';
 const AppShell: React.FC = () => {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
   const [chatNavigationData, setChatNavigationData] = useState<{
     friendUid: string; friendName: string; friendPhoto: string;
   } | null>(null);
+
+  useEffect(() => {
+    // Auto-request notification permission on mount if default
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((perm) => setNotifPermission(perm)).catch(() => {});
+    }
+  }, []);
+
+  const handleRequestNotif = async () => {
+    if (!('Notification' in window)) {
+      alert('Notifications are not supported by this browser.');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      alert('Notifications are enabled!');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setNotifPermission(perm);
+      if (perm === 'granted') {
+        new Notification('VEYRA Notifications Enabled', {
+          body: 'You will receive instant message notifications on PC and mobile!',
+          icon: '/pwa-192x192.png',
+        });
+      }
+    } catch (_e) {}
+  };
 
   if (loading) {
     return (
@@ -65,7 +96,19 @@ const AppShell: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5">
+          <button
+            onClick={handleRequestNotif}
+            className={`p-2 rounded-xl transition-all ${
+              notifPermission === 'granted'
+                ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                : 'text-slate-400 bg-slate-800/60 hover:text-slate-200'
+            }`}
+            title={notifPermission === 'granted' ? 'Notifications Active' : 'Enable Notifications'}
+          >
+            {notifPermission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+          </button>
+
           <button
             onClick={() => triggerAppInstall()}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-500/20 active:scale-95 transition-all"

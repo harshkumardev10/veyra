@@ -103,7 +103,55 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     }
   };
 
-  // Load my chats in real-time (sorted in client to avoid requiring composite Firestore index)
+  const isInitialChatsLoad = useRef(true);
+
+  // Play a soft chime sound on message receive
+  const playChimeSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (_e) {}
+  };
+
+  // Helper to show notification on PC and Mobile
+  const triggerMessageNotification = (title: string, body: string, photo?: string, chatId?: string) => {
+    playChimeSound();
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.showNotification(title, {
+            body,
+            icon: photo || '/pwa-192x192.png',
+            tag: chatId || 'veyra-msg',
+            data: { chatId },
+          } as any);
+        });
+      } else {
+        const notif = new Notification(title, {
+          body,
+          icon: photo || '/pwa-192x192.png',
+          tag: chatId || 'veyra-msg',
+        });
+        notif.onclick = () => {
+          window.focus();
+        };
+      }
+    }
+  };
+
+  // Load my chats in real-time & notify on new incoming messages
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -115,6 +163,25 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
       (snap) => {
         const list: Chat[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Chat));
         list.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+
+        if (!isInitialChatsLoad.current) {
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'modified' || change.type === 'added') {
+              const updatedChat = { id: change.doc.id, ...change.doc.data() } as Chat;
+              if (
+                updatedChat.lastSenderId &&
+                updatedChat.lastSenderId !== user.uid &&
+                updatedChat.lastMessageAt &&
+                Date.now() - updatedChat.lastMessageAt < 8000
+              ) {
+                const senderName = updatedChat.participantNames?.[updatedChat.lastSenderId] || 'New Message';
+                const senderPhoto = updatedChat.participantPhotos?.[updatedChat.lastSenderId] || '';
+                triggerMessageNotification(senderName, updatedChat.lastMessage || 'Sent a message', senderPhoto, updatedChat.id);
+              }
+            }
+          });
+        }
+        isInitialChatsLoad.current = false;
         setChats(list);
       },
       (err) => {
