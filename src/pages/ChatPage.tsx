@@ -127,6 +127,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     } catch (_e) {}
   };
 
+  const processedMessageKeysRef = useRef<Set<string>>(new Set());
+
   // Helper to show notification on PC and Mobile (In-App Floating Banner + System Notification)
   const triggerMessageNotification = (title: string, body: string, photo?: string, chatId?: string, senderUid?: string) => {
     playChimeSound();
@@ -177,29 +179,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
         const list: Chat[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Chat));
         list.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
 
-        if (!isInitialChatsLoad.current) {
-          snap.docChanges().forEach((change) => {
-            if (change.type === 'modified' || change.type === 'added') {
-              const updatedChat = { id: change.doc.id, ...change.doc.data() } as Chat;
-              if (
-                updatedChat.lastSenderId &&
-                updatedChat.lastSenderId !== user.uid &&
-                updatedChat.lastMessageAt &&
-                Date.now() - updatedChat.lastMessageAt < 8000
-              ) {
-                const senderName = updatedChat.participantNames?.[updatedChat.lastSenderId] || 'New Message';
-                const senderPhoto = updatedChat.participantPhotos?.[updatedChat.lastSenderId] || '';
+        list.forEach((c) => {
+          if (c.lastSenderId && c.lastSenderId !== user.uid && c.lastMessageAt) {
+            const key = `${c.id}_${c.lastMessageAt}_${c.lastMessage}`;
+            if (!processedMessageKeysRef.current.has(key)) {
+              processedMessageKeysRef.current.add(key);
+              // Only trigger notification if this is a live incoming message after initial load
+              if (!isInitialChatsLoad.current) {
+                const senderName = c.participantNames?.[c.lastSenderId] || 'New Message';
+                const senderPhoto = c.participantPhotos?.[c.lastSenderId] || '';
                 triggerMessageNotification(
                   senderName,
-                  updatedChat.lastMessage || 'Sent a message',
+                  c.lastMessage || 'Sent a message',
                   senderPhoto,
-                  updatedChat.id,
-                  updatedChat.lastSenderId
+                  c.id,
+                  c.lastSenderId
                 );
               }
             }
-          });
-        }
+          }
+        });
+
         isInitialChatsLoad.current = false;
         setChats(list);
       },

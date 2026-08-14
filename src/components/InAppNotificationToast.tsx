@@ -42,7 +42,7 @@ export const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
             onSelectNotif(notification);
             onDismiss();
           }}
-          className="fixed top-3 left-4 right-4 z-[100] max-w-md mx-auto bg-[#161F30]/95 border border-amber-500/40 rounded-2xl p-3.5 shadow-2xl shadow-black/90 backdrop-blur-xl cursor-pointer active:scale-98 transition-transform flex items-center space-x-3"
+          className="fixed top-4 left-4 right-4 z-[9999] max-w-md mx-auto bg-[#161F30]/95 border border-amber-500/50 rounded-2xl p-3.5 shadow-2xl shadow-black/90 backdrop-blur-xl cursor-pointer active:scale-98 transition-all flex items-center space-x-3 pointer-events-auto"
         >
           {/* Sender Avatar */}
           <div className="relative flex-shrink-0">
