@@ -28,6 +28,7 @@ import {
   Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserProfileModal } from '../components/UserProfileModal';
 
 interface FriendsPageProps {
   onOpenChat: (friendUid: string, friendName: string, friendPhoto: string) => void;
@@ -137,6 +138,8 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
     return () => clearTimeout(timer);
   }, [searchQuery, user]);
 
+  const [viewProfileUid, setViewProfileUid] = useState<string | null>(null);
+
   const isFriend = (uid: string) => friends.some((f) => f.uid === uid);
   const hasSentRequest = (uid: string) => sentRequests.some((r) => r.toUid === uid);
 
@@ -146,13 +149,15 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
     try {
       await addDoc(collection(db, 'friend_requests'), {
         fromUid: user.uid,
-        fromName: user.displayName,
-        fromPhoto: user.photoURL,
-        fromUsername: user.username,
+        fromName: user.displayName || 'User',
+        fromPhoto: user.photoURL || '',
+        fromUsername: user.username || '',
         toUid: target.uid,
         status: 'pending',
         createdAt: Date.now(),
       });
+    } catch (err) {
+      console.error('Error sending friend request:', err);
     } finally {
       setProcessingIds((prev) => { const s = new Set(prev); s.delete(target.uid); return s; });
     }
@@ -278,25 +283,31 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
                 key={friend.uid}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3"
+                className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3 hover:border-amber-500/30 transition-colors"
               >
-                <div className="relative flex-shrink-0">
-                  <img
-                    src={friend.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(friend.displayName)}`}
-                    alt={friend.displayName}
-                    className="w-11 h-11 rounded-full object-cover border border-slate-700"
-                  />
-                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#0F1724] ${friend.isOnline ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-100 truncate">{friend.displayName}</p>
-                  <p className="text-[11px] text-slate-500">
-                    {friend.isOnline ? 'Online' : `Last seen ${new Date(friend.lastSeen).toLocaleDateString()}`}
-                  </p>
-                </div>
+                <button
+                  onClick={() => setViewProfileUid(friend.uid)}
+                  className="flex items-center space-x-3 flex-1 min-w-0 text-left group"
+                >
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={friend.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(friend.displayName)}`}
+                      alt={friend.displayName}
+                      className="w-11 h-11 rounded-full object-cover border border-slate-700 group-hover:border-amber-500/50 group-hover:scale-105 transition-all"
+                    />
+                    <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#0F1724] ${friend.isOnline ? 'bg-emerald-500' : 'bg-slate-600'}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors truncate">{friend.displayName}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {friend.isOnline ? 'Online' : `Last seen ${new Date(friend.lastSeen).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                </button>
                 <button
                   onClick={() => openChatWithFriend(friend)}
                   className="p-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                  title="Chat with friend"
                 >
                   <MessageSquare className="w-4 h-4" />
                 </button>
@@ -315,16 +326,21 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
               </div>
             ) : (
               incomingRequests.map((req) => (
-                <div key={req.id} className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-amber-500/20 p-3">
-                  <img
-                    src={req.fromPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(req.fromName)}`}
-                    alt={req.fromName}
-                    className="w-11 h-11 rounded-full object-cover border border-slate-700"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-100">{req.fromName}</p>
-                    <p className="text-[11px] text-slate-500">@{req.fromUsername} • wants to connect</p>
-                  </div>
+                <div key={req.id} className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-amber-500/20 p-3 hover:border-amber-500/40 transition-colors">
+                  <button
+                    onClick={() => setViewProfileUid(req.fromUid)}
+                    className="flex items-center space-x-3 flex-1 min-w-0 text-left group"
+                  >
+                    <img
+                      src={req.fromPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(req.fromName)}`}
+                      alt={req.fromName}
+                      className="w-11 h-11 rounded-full object-cover border border-slate-700 group-hover:border-amber-500/50 group-hover:scale-105 transition-all flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors truncate">{req.fromName}</p>
+                      <p className="text-[11px] text-slate-500">@{req.fromUsername} • wants to connect</p>
+                    </div>
+                  </button>
                   <div className="flex items-center space-x-1.5">
                     <button
                       onClick={() => acceptRequest(req)}
@@ -387,31 +403,55 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
                   const alreadySent = hasSentRequest(result.uid);
 
                   return (
-                    <div key={result.uid} className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3 hover:border-slate-700/60 transition-colors">
-                      <img
-                        src={result.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(result.displayName)}`}
-                        alt={result.displayName}
-                        className="w-11 h-11 rounded-full object-cover border border-slate-700 flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-100 truncate">{result.displayName}</p>
-                        <p className="text-xs text-amber-400/90 font-mono font-medium">@{result.username}</p>
-                      </div>
+                    <div
+                      key={result.uid}
+                      className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3 hover:border-amber-500/30 transition-colors"
+                    >
+                      <button
+                        onClick={() => setViewProfileUid(result.uid)}
+                        className="flex items-center space-x-3 flex-1 min-w-0 text-left group"
+                      >
+                        <img
+                          src={result.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(result.displayName)}`}
+                          alt={result.displayName}
+                          className="w-11 h-11 rounded-full object-cover border border-slate-700 group-hover:border-amber-500/50 group-hover:scale-105 transition-all flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors truncate">
+                            {result.displayName}
+                          </p>
+                          <p className="text-xs text-amber-400/90 font-mono font-medium">@{result.username}</p>
+                        </div>
+                      </button>
+
                       {alreadyFriend ? (
-                        <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-medium flex items-center space-x-1">
-                          <Check className="w-3 h-3" />
+                        <button
+                          onClick={() => openChatWithFriend({
+                            uid: result.uid,
+                            displayName: result.displayName,
+                            username: result.username,
+                            photoURL: result.photoURL,
+                            isOnline: result.isOnline,
+                            lastSeen: result.lastSeen,
+                          })}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center space-x-1 transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" />
                           <span>Friends</span>
-                        </span>
+                        </button>
                       ) : alreadySent ? (
-                        <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-400 text-xs font-medium flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
+                        <span className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-medium flex items-center space-x-1">
+                          <Clock className="w-3.5 h-3.5" />
                           <span>Sent</span>
                         </span>
                       ) : (
                         <button
-                          onClick={() => sendFriendRequest(result)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sendFriendRequest(result);
+                          }}
                           disabled={processingIds.has(result.uid)}
-                          className="p-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                          className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white shadow-md active:scale-95 transition-all disabled:opacity-50"
                           title="Send friend request"
                         >
                           <UserPlus className="w-4 h-4" />
@@ -425,6 +465,16 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
           </div>
         )}
       </div>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        uid={viewProfileUid}
+        onClose={() => setViewProfileUid(null)}
+        onSendMessage={(uid, name, photo) => {
+          onOpenChat(uid, name, photo);
+        }}
+      />
     </div>
   );
 };
+
