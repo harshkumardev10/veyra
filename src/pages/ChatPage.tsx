@@ -129,39 +129,47 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
 
   const processedMessageKeysRef = useRef<Set<string>>(new Set());
 
-  // Helper to show notification on PC and Mobile (In-App Floating Banner + System Notification)
+  // Helper to show notification on PC and Mobile
+  // - App VISIBLE: show in-app banner toast + chime only (no Chrome/OS notification)
+  // - App HIDDEN/BACKGROUNDED: show OS system notification via service worker
   const triggerMessageNotification = (title: string, body: string, photo?: string, chatId?: string, senderUid?: string) => {
-    playChimeSound();
+    const isAppVisible = document.visibilityState === 'visible';
 
-    // Trigger floating in-app notification banner
-    setActiveInAppNotif({
-      id: String(Date.now()),
-      senderUid: senderUid || '',
-      senderName: title,
-      senderPhoto: photo || '',
-      text: body,
-      chatId: chatId || '',
-    });
-
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.ready.then((reg) => {
-          reg.showNotification(title, {
+    if (isAppVisible) {
+      // App is open and user can see it — show in-app floating banner + chime only
+      playChimeSound();
+      setActiveInAppNotif({
+        id: String(Date.now()),
+        senderUid: senderUid || '',
+        senderName: title,
+        senderPhoto: photo || '',
+        text: body,
+        chatId: chatId || '',
+      });
+    } else {
+      // App is backgrounded/minimized — show OS system notification
+      playChimeSound();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.showNotification(`💬 ${title}`, {
+              body,
+              icon: photo || './pwa-192x192.png',
+              badge: './pwa-192x192.png',
+              tag: chatId || 'veyra-msg',
+              renotify: true,
+              vibrate: [200, 100, 200],
+              data: { chatId },
+            } as any);
+          });
+        } else {
+          const notif = new Notification(`💬 ${title}`, {
             body,
-            icon: photo || '/pwa-192x192.png',
+            icon: photo || './pwa-192x192.png',
             tag: chatId || 'veyra-msg',
-            data: { chatId },
-          } as any);
-        });
-      } else {
-        const notif = new Notification(title, {
-          body,
-          icon: photo || '/pwa-192x192.png',
-          tag: chatId || 'veyra-msg',
-        });
-        notif.onclick = () => {
-          window.focus();
-        };
+          });
+          notif.onclick = () => { window.focus(); };
+        }
       }
     }
   };
@@ -209,6 +217,20 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     );
     return () => unsub();
   }, [user]);
+
+  // Listen for notification click postMessage from service worker (when app is backgrounded)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK' && event.data.chatId) {
+        setActiveChatId(event.data.chatId);
+        setShowMobileChat(true);
+        window.focus();
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
 
   // Load friends list in real-time
   useEffect(() => {
