@@ -104,27 +104,38 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
     return () => unsub();
   }, [user]);
 
-  // Search users by username
-  const handleSearch = async () => {
+  // Search users by username (real-time debounced)
+  useEffect(() => {
     const cleanQuery = searchQuery.trim().toLowerCase().replace(/^@/, '');
-    if (!cleanQuery || !user) return;
-    setSearching(true);
-    try {
-      const q = query(
-        collection(db, 'users'),
-        where('username', '>=', cleanQuery),
-        where('username', '<=', cleanQuery + '\uf8ff'),
-        limit(15)
-      );
-      const snap = await getDocs(q);
-      const results: UserProfile[] = snap.docs
-        .map((d) => ({ uid: d.id, ...d.data() } as UserProfile))
-        .filter((u) => u.uid !== user.uid);
-      setSearchResults(results);
-    } finally {
+    if (!cleanQuery || !user) {
+      setSearchResults([]);
       setSearching(false);
+      return;
     }
-  };
+
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const q = query(
+          collection(db, 'users'),
+          where('username', '>=', cleanQuery),
+          where('username', '<=', cleanQuery + '\uf8ff'),
+          limit(15)
+        );
+        const snap = await getDocs(q);
+        const results: UserProfile[] = snap.docs
+          .map((d) => ({ uid: d.id, ...d.data() } as UserProfile))
+          .filter((u) => u.uid !== user.uid);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Error searching username:', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, user]);
 
   const isFriend = (uid: string) => friends.some((f) => f.uid === uid);
   const hasSentRequest = (uid: string) => sentRequests.some((r) => r.toUid === uid);
@@ -338,67 +349,78 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({ onOpenChat }) => {
         {/* SEARCH TAB */}
         {activeTab === 'search' && (
           <div className="space-y-4">
-            <div className="flex space-x-2">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="space-y-1.5">
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold text-sm select-none">@</span>
                 <input
                   type="text"
-                  placeholder="Search by username (e.g. @alex)..."
+                  placeholder="type username e.g. john..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full bg-[#0F1724] border border-slate-800 rounded-2xl pl-9 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
+                  className="w-full bg-[#0F1724] border border-slate-800 rounded-2xl pl-8 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
                 />
-              </div>
-              <button
-                onClick={handleSearch}
-                disabled={searching || !searchQuery.trim()}
-                className="px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 text-white text-sm font-semibold disabled:opacity-50"
-              >
                 {searching ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : 'Search'}
-              </button>
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                ) : searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 px-1">
+                Type any username with or without <span className="text-amber-400 font-mono">@</span> to instantly find people
+              </p>
             </div>
 
             <div className="space-y-2">
-              {searchResults.map((result) => {
-                const alreadyFriend = isFriend(result.uid);
-                const alreadySent = hasSentRequest(result.uid);
+              {searchResults.length === 0 && searchQuery.trim() && !searching ? (
+                <div className="text-center py-12 space-y-2 text-slate-500">
+                  <Search className="w-8 h-8 mx-auto text-slate-700" />
+                  <p className="text-xs">No user found with username <span className="text-amber-400">@{searchQuery.replace(/^@/, '')}</span></p>
+                </div>
+              ) : (
+                searchResults.map((result) => {
+                  const alreadyFriend = isFriend(result.uid);
+                  const alreadySent = hasSentRequest(result.uid);
 
-                return (
-                  <div key={result.uid} className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3">
-                    <img
-                      src={result.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(result.displayName)}`}
-                      alt={result.displayName}
-                      className="w-11 h-11 rounded-full object-cover border border-slate-700"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-100 truncate">{result.displayName}</p>
-                      <p className="text-[11px] text-slate-500">@{result.username}</p>
+                  return (
+                    <div key={result.uid} className="flex items-center space-x-3 bg-[#0F1724] rounded-2xl border border-slate-800/60 p-3 hover:border-slate-700/60 transition-colors">
+                      <img
+                        src={result.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(result.displayName)}`}
+                        alt={result.displayName}
+                        className="w-11 h-11 rounded-full object-cover border border-slate-700 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-100 truncate">{result.displayName}</p>
+                        <p className="text-xs text-amber-400/90 font-mono font-medium">@{result.username}</p>
+                      </div>
+                      {alreadyFriend ? (
+                        <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-medium flex items-center space-x-1">
+                          <Check className="w-3 h-3" />
+                          <span>Friends</span>
+                        </span>
+                      ) : alreadySent ? (
+                        <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-400 text-xs font-medium flex items-center space-x-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Sent</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => sendFriendRequest(result)}
+                          disabled={processingIds.has(result.uid)}
+                          className="p-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                          title="Send friend request"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    {alreadyFriend ? (
-                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-medium flex items-center space-x-1">
-                        <Check className="w-3 h-3" />
-                        <span>Friends</span>
-                      </span>
-                    ) : alreadySent ? (
-                      <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-400 text-xs font-medium flex items-center space-x-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Sent</span>
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => sendFriendRequest(result)}
-                        disabled={processingIds.has(result.uid)}
-                        className="p-2 rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}
