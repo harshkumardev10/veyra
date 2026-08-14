@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfileModal } from '../components/UserProfileModal';
+import { InAppNotificationToast, type InAppNotifData } from '../components/InAppNotificationToast';
 
 interface ChatPageProps {
   initialFriendUid?: string | null;
@@ -51,6 +52,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
   const [heartAnimId, setHeartAnimId] = useState<string | null>(null);
   const [activeReactionPickerMsgId, setActiveReactionPickerMsgId] = useState<string | null>(null);
   const [viewProfileUid, setViewProfileUid] = useState<string | null>(null);
+  const [activeInAppNotif, setActiveInAppNotif] = useState<InAppNotifData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<{ msgId: string; time: number } | null>(null);
@@ -125,9 +127,20 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
     } catch (_e) {}
   };
 
-  // Helper to show notification on PC and Mobile
-  const triggerMessageNotification = (title: string, body: string, photo?: string, chatId?: string) => {
+  // Helper to show notification on PC and Mobile (In-App Floating Banner + System Notification)
+  const triggerMessageNotification = (title: string, body: string, photo?: string, chatId?: string, senderUid?: string) => {
     playChimeSound();
+
+    // Trigger floating in-app notification banner
+    setActiveInAppNotif({
+      id: String(Date.now()),
+      senderUid: senderUid || '',
+      senderName: title,
+      senderPhoto: photo || '',
+      text: body,
+      chatId: chatId || '',
+    });
+
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.ready.then((reg) => {
@@ -176,7 +189,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
               ) {
                 const senderName = updatedChat.participantNames?.[updatedChat.lastSenderId] || 'New Message';
                 const senderPhoto = updatedChat.participantPhotos?.[updatedChat.lastSenderId] || '';
-                triggerMessageNotification(senderName, updatedChat.lastMessage || 'Sent a message', senderPhoto, updatedChat.id);
+                triggerMessageNotification(
+                  senderName,
+                  updatedChat.lastMessage || 'Sent a message',
+                  senderPhoto,
+                  updatedChat.id,
+                  updatedChat.lastSenderId
+                );
               }
             }
           });
@@ -840,6 +859,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
           } else {
             startChatWithFriend({ uid, displayName: name, username: '', photoURL: photo, isOnline: false, lastSeen: 0 });
           }
+        }}
+      />
+
+      {/* Floating In-App Real-Time Notification Toast */}
+      <InAppNotificationToast
+        notification={activeInAppNotif}
+        onDismiss={() => setActiveInAppNotif(null)}
+        onSelectNotif={(notif) => {
+          setActiveChatId(notif.chatId);
+          setShowMobileChat(true);
         }}
       />
     </div>
