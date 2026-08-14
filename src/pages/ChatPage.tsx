@@ -31,6 +31,7 @@ import {
   Smile,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { UserProfileModal } from '../components/UserProfileModal';
 
 interface ChatPageProps {
   initialFriendUid?: string | null;
@@ -49,6 +50,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [heartAnimId, setHeartAnimId] = useState<string | null>(null);
   const [activeReactionPickerMsgId, setActiveReactionPickerMsgId] = useState<string | null>(null);
+  const [viewProfileUid, setViewProfileUid] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastTapRef = useRef<{ msgId: string; time: number } | null>(null);
@@ -527,17 +529,20 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
                 {activeChat && (() => {
                   const other = getOtherParticipant(activeChat);
                   return (
-                    <>
+                    <button
+                      onClick={() => setViewProfileUid(other.uid)}
+                      className="flex items-center space-x-3 hover:opacity-80 transition-opacity text-left"
+                    >
                       <img
                         src={other.photo || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(other.name)}`}
                         alt={other.name}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                        className="w-9 h-9 rounded-full object-cover border border-slate-700 hover:border-amber-500/50 transition-colors"
                       />
                       <div>
-                        <h3 className="text-sm font-bold text-slate-100">{other.name}</h3>
-                        <p className="text-[10px] text-emerald-400">Active</p>
+                        <h3 className="text-sm font-bold text-slate-100 hover:text-amber-400 transition-colors">{other.name}</h3>
+                        <p className="text-[10px] text-emerald-400">Tap to view profile</p>
                       </div>
-                    </>
+                    </button>
                   );
                 })()}
               </div>
@@ -558,17 +563,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
                       {!isMe && (
                         <div className="w-7 flex-shrink-0">
                           {showAvatar && (
-                            <img
-                              src={msg.senderPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(msg.senderName)}`}
-                              alt={msg.senderName}
-                              className="w-7 h-7 rounded-full object-cover border border-slate-700"
-                            />
+                            <button onClick={() => setViewProfileUid(msg.senderId)} className="block">
+                              <img
+                                src={msg.senderPhoto || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(msg.senderName)}`}
+                                alt={msg.senderName}
+                                className="w-7 h-7 rounded-full object-cover border border-slate-700 hover:border-amber-500/50 transition-colors hover:scale-110"
+                              />
+                            </button>
                           )}
                         </div>
                       )}
                       <div className={`max-w-[70%] space-y-0.5 ${isMe ? 'items-end' : 'items-start'} flex flex-col relative group`}>
                         {!isMe && showAvatar && (
-                          <span className="text-[10px] text-slate-500 ml-1">{msg.senderName}</span>
+                          <button onClick={() => setViewProfileUid(msg.senderId)} className="text-[10px] text-slate-500 ml-1 hover:text-amber-400 transition-colors">{msg.senderName}</button>
                         )}
 
                         {/* Floating Emoji Picker Popup */}
@@ -724,33 +731,50 @@ export const ChatPage: React.FC<ChatPageProps> = ({ initialFriendUid, onClearIni
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-1">
               {friends.map((friend) => (
-                <button
+                <div
                   key={friend.uid}
-                  onClick={() => startChatWithFriend(friend)}
-                  className="w-full flex items-center space-x-3 p-2.5 rounded-xl hover:bg-slate-800/60 transition-all text-left group"
+                  className="w-full flex items-center space-x-3 p-2.5 rounded-xl hover:bg-slate-800/60 transition-all group"
                 >
-                  <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setViewProfileUid(friend.uid)}
+                    className="relative flex-shrink-0"
+                    title="View profile"
+                  >
                     <img
                       src={friend.photoURL || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(friend.displayName)}`}
                       alt={friend.displayName}
-                      className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                      className="w-9 h-9 rounded-full object-cover border border-slate-700 hover:border-amber-500/50 hover:scale-110 transition-all"
                     />
                     <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#0F1724] ${friend.isOnline ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                  </button>
+                  <button onClick={() => startChatWithFriend(friend)} className="min-w-0 flex-1 text-left">
                     <p className="text-xs font-semibold text-slate-200 group-hover:text-amber-400 transition-colors truncate">
                       {friend.displayName}
                     </p>
                     <p className={`text-[10px] truncate ${friend.isOnline ? 'text-emerald-400' : 'text-slate-500'}`}>
-                      {friend.isOnline ? 'Online' : 'Offline'}
+                      {friend.isOnline ? 'Online · tap name to chat' : 'Offline'}
                     </p>
-                  </div>
-                </button>
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         )}
       </div>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        uid={viewProfileUid}
+        onClose={() => setViewProfileUid(null)}
+        onSendMessage={(uid, name, photo) => {
+          const friend = friends.find((f) => f.uid === uid);
+          if (friend) {
+            startChatWithFriend(friend);
+          } else {
+            startChatWithFriend({ uid, displayName: name, username: '', photoURL: photo, isOnline: false, lastSeen: 0 });
+          }
+        }}
+      />
     </div>
   );
 };
