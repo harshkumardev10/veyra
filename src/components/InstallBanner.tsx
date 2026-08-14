@@ -2,14 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Download, X, Heart, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const DISMISSED_KEY = 'veyra_install_dismissed';
-
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-// Global trigger function so any button (e.g. Header button) can trigger app installation directly
+// Global trigger function so any button can trigger app installation directly
 let globalTriggerInstall: (() => void) | null = null;
 export const triggerAppInstall = () => {
   if (globalTriggerInstall) globalTriggerInstall();
@@ -17,7 +15,7 @@ export const triggerAppInstall = () => {
 
 export const InstallBanner: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showBanner, setShowBanner] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
   const [isStandalone, setIsStandalone] = useState(false);
   const [installing, setInstalling] = useState(false);
 
@@ -29,6 +27,7 @@ export const InstallBanner: React.FC = () => {
 
     if (checkStandalone) {
       setIsStandalone(true);
+      setShowBanner(false);
       return;
     }
 
@@ -40,17 +39,6 @@ export const InstallBanner: React.FC = () => {
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-
-    // Auto-show banner if not dismissed yet
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
-    if (!dismissed) {
-      const timer = setTimeout(() => setShowBanner(true), 1200);
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('beforeinstallprompt', handler);
-      };
-    }
-
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
@@ -81,7 +69,6 @@ export const InstallBanner: React.FC = () => {
 
   const handleDismiss = () => {
     setShowBanner(false);
-    localStorage.setItem(DISMISSED_KEY, '1');
   };
 
   if (isStandalone) return null;
