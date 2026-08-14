@@ -1,7 +1,7 @@
-// Firebase SDK initialization with explicit production fallback
+// Firebase SDK initialization with auto-detect long polling fallback for mobile devices
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAYHO2GCdvtmPr8lXzsJM1Lf0fCBCzeSBE',
@@ -15,7 +15,13 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+// Initialize Firestore with auto-detect long polling to prevent mobile database closure errors
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
+
 export const googleProvider = new GoogleAuthProvider();
 
 export default app;
